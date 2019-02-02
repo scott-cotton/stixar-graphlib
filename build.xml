@@ -1,0 +1,248 @@
+
+<!-- build file for Stixar Libs -->
+
+<project name="stixar-graphlib" default="dist">
+
+  <property file="${basedir}/default.properties"/>
+
+  <property name="basedir" value="."/>
+  <property name="srcdir" value="${basedir}/src"/>
+  <property name="datasrc" value="${srcdir}/data"/>
+  <property name="javasrc" value="${srcdir}/java"/>
+  <property name="testsrc" value="${srcdir}/test"/>
+  <property name="scriptsrc" value="${srcdir}/scripts"/>
+  <property name="confsrc" value="${srcdir}/conf"/>
+  <property name="docsrc" value="${srcdir}/doc"/>
+  <property name="websrc" value="${srcdir}/web"/>
+  <property name="builddir" value="${basedir}/build"/>
+  <property name="build.web" value="${builddir}/web"/>
+  <property name="distdir" value="${basedir}/dist"/>
+  <property name="name" value="mosl"/>
+  <property name="version_status" value="alpha"/>
+  <property name="version_number" value="0.0.0"/>
+  <property name="distname" value="${name}-${version_number}-${version_status}"/>
+  <property name="tmpdir" value="/tmp"/>
+
+  <target name="help">
+    <echo>
+                      Welcome to the Stixar  build system.
+
+Available targets include
+
+ - compile............................compile java source code
+ - test...............................Run Junit tests                      
+ - dist...............................build distribution [default]
+ - javadoc............................create javadocs
+ - generate-web.......................create web pages
+ - setup.sh...........................create setup.sh file
+ - help...............................this message
+
+</echo>
+
+  </target>
+
+  <!--
+      set up the classpath to includethe ant stuff we need to run junit tasks
+    -->
+  <path id="classpath">
+    <pathelement path="." />
+    <fileset dir="${basedir}" includes="lib/*.jar"/>
+  </path>
+
+  <!--
+      create dist and buid directories
+    -->
+  <target name="init">
+    <tstamp/>
+    <mkdir dir="${builddir}"/>
+    <mkdir dir="${builddir}/classes"/>
+    <mkdir dir="${distdir}"/>
+    <mkdir dir="${distdir}/classes"/>
+    <mkdir dir="${distdir}/conf"/>
+    <mkdir dir="${distdir}/lib"/>
+    <mkdir dir="${distdir}/bin"/>
+  </target>
+
+
+  <!-- 
+       compile java code
+    -->
+  <target name="compile" depends="init">
+    <javac srcdir="${javasrc}"
+           includes="**/*.java"
+           debug="true" 
+           debuglevel="source,lines,vars"
+           source="1.5"
+           destdir="${builddir}/classes"> 
+      <classpath refid="classpath"/>
+    </javac>
+  </target>
+
+  <!-- 
+       build docs
+    -->
+  <target name="javadoc" depends="compile" unless="javadocs-created">
+    <javadoc sourcepath="${javasrc}" 
+             source="1.5"
+             destdir="${build.web}/javadoc" 
+             public="true" 
+             overview="${srcdir}/java/overview.html"
+             author="true"
+             use="true"
+             windowtitle="${distname} API documentation"
+             doctitle="${distname} API documentation">
+             <bottom>&lt;center&gt;Copyright 2005, StiXar&lt;/center&gt;</bottom>
+      <classpath refid="classpath"/>
+	<fileset dir="${javasrc}" includes="**/*.java"/>
+
+        <group title="Graphs"
+        packages="stixar.graph,stixar.graph.search,stixar.graph.gen,stixar.graph.edit,stixar.graph.flow,stixar.graph.paths,stixar.graph.check,stixar.graph.conn,stixar.graph.order,stixar.graph.attr,stixar.graph.topo"/>
+        <group title="Geometry" packages="stixar.geom2d,stixar.geom3d"/>
+        <group title="Utilities"
+        packages="stixar.util,stixar.util.fheap"/>
+
+    </javadoc>
+    <touch>
+      <fileset dir="${build.web}/javadoc/" includes="*"/>
+    </touch>
+  </target>
+
+  <target name="doc" depends="javadoc" />
+
+  <!--
+      delete everything but the source
+    -->
+  <target name="clean">
+
+    <delete dir="${builddir}"/>
+    <delete dir="${distdir}"/>
+    <delete>
+      <fileset dir="." defaultexcludes="no">
+	<patternset id="build-backups-and-locks">
+	  <include name="**/*~"/>
+	  <include name="**/*~"/>
+	  <include name="**/#*"/>
+          <include name="**/*.log"/>
+          <include name="**/*.dvi"/>
+          <include name="**/*.ps"/>
+          <include name="**/*.pdf"/>
+          <include name="**/*.class"/>
+	</patternset>
+      </fileset>
+    </delete>
+  </target>
+
+  <!--
+      run unit tests!
+    -->
+  <target name="testinit" depends="compile">
+    <delete dir="${builddir}/test"/>
+    <mkdir dir="${builddir}/test"/>
+    <mkdir dir="${builddir}/test/reports"/>
+    <mkdir dir="${builddir}/test/classes"/>
+    <mkdir dir="${builddir}/test/data"/>
+    <mkdir dir="${stixar.test.tmpdir}"/>
+  </target>
+
+  <target name="compile-test" depends="compile,testinit">
+    <javac srcdir="${testsrc}"
+           includes="**/*.java"
+           debug="true" 
+           debuglevel="source,lines,vars"
+           source="1.5"
+           destdir="${builddir}/test/classes"> 
+      <classpath>
+        <path refid="classpath"/>
+        <pathelement location="${builddir}/classes"/>
+      </classpath>
+    </javac>
+
+  </target>
+
+  <!--
+      junit tests.
+    -->
+  <target name="test" depends="testinit,compile-test">
+    <junit fork="no" 
+           showoutput="no" 
+           printsummary="yes" 
+           filtertrace="off">
+      <formatter type="plain"/>
+      <formatter type="xml"/>
+      <classpath>
+        <path refid="classpath"/>
+        <pathelement location="${builddir}/classes"/>
+        <pathelement location="${builddir}/test/classes"/>
+        <pathelement location="/Users/scott/Development/VC/stixar/lib/junit.jar"/>
+      </classpath>
+      <sysproperty key="junit.basedir" value="${builddir}/test"/>
+      <sysproperty key="stixar.test.tmpdir" value="${stixar.test.tmpdir}"/>
+      <batchtest todir="${builddir}/test/data">
+      <fileset dir="${builddir}/test/classes"
+                 includes="**/*Test.class"/>
+      </batchtest>
+    </junit>
+
+    <junitreport todir="${builddir}/test/reports">
+      <fileset dir="${builddir}/test/data">
+        <include name="TEST-*.xml"/>
+      </fileset>
+      <report format="frames"
+              todir="${builddir}/test/reports"/>
+    </junitreport>
+
+  </target>
+
+
+  <!--
+      create setup.sh
+    -->
+  <target name="setup.sh">
+    <copy file="${scriptsrc}/setup.sh.in" 
+          tofile="${scriptsrc}/setup.sh" 
+          overwrite="true">
+      <filterchain>
+        <filterreader 
+           classname="org.apache.tools.ant.filters.ExpandProperties"/>
+      </filterchain>
+    </copy>
+  </target>
+
+
+  <!--
+      distribution target
+
+      XXX we will have to make distribution targets for other licenses,
+      which may entail more than just attaching a different license.
+    -->
+  <target name="distnodoc" depends="compile,setup.sh">
+
+    <jar jarfile="${distdir}/lib/${distname}.jar"
+         index="true">
+        <fileset dir="${builddir}/classes"/>
+        <fileset dir="${basedir}" excludes=".svn" includes="src/**/*"/>
+        <fileset dir="${basedir}"
+            includes="LICENSE.txt,build.xml,default.properties"/>
+    </jar>
+
+    <copy todir="${distdir}/classes">
+      <fileset dir="${builddir}/classes"/>
+    </copy>
+
+    <chmod dir="${distdir}/bin" perm="0555"
+      includes ="*"/>
+
+
+    <copy todir="${distdir}/lib">
+      <fileset dir="${basedir}/lib/"/>
+    </copy>
+
+  </target>
+
+  <target name="dist" depends="distnodoc,doc">
+    <copy todir="${distdir}/doc/html">
+      <fileset dir="${builddir}/web"/>
+    </copy>
+  </target>
+
+</project>
